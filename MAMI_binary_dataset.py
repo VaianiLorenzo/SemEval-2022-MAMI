@@ -38,3 +38,6 @@ class MAMI_binary_dataset(data.Dataset):
         data = np.asarray(img, dtype="float32")
         return data
 
+    def __len__(self):
+        return len(self.text)
+
