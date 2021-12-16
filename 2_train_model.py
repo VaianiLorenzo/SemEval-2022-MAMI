@@ -32,8 +32,14 @@ def collate_fn(batch):
     text  = [item[0] for item in batch]
     img   = [item[1] for item in batch]
     label = [item[2] for item in batch]
-
     return [text, img, label]
+
+def binary_acc(y_pred, y_test):
+    y_pred_tag = torch.round(torch.sigmoid(y_pred))
+    correct_results_sum = (y_pred_tag == y_test).sum().float()
+    acc = correct_results_sum / y_test.shape[0]
+    acc = acc.item() * 100
+    return acc
 
 checkpoint_dir = "checkpoints_binary_model/"
 
@@ -57,9 +63,11 @@ model.train()
 #loss_function = CrossEntropyLoss()
 loss_function = BCEWithLogitsLoss()
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma = 0.1)
+scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma = 1)
 
 for epoch in range(0, n_epochs):  # 5 epochs at maximum
+
+
     print(f'Starting epoch {epoch + 1}')
 
     # Set current loss value
@@ -95,18 +103,8 @@ for epoch in range(0, n_epochs):  # 5 epochs at maximum
         # Print statistics
         current_loss += loss.item()
 
-        if i % 10 == 0 and i != 0:
-            print("LR:", scheduler.get_last_lr())
-            print('Loss after mini-batch %5d: %.8f' %
-                  (i + 1, current_loss / 10))
-            current_loss = 0.0
-            #print("TARGETS:", list(targets))
-            #print("OUTPUTS:", outputs)
-            if i % 100 == 0:
-                epoch_name = "MAMI_binary_model_" + str(epoch) + "-" + str(i) + ".model"
-                ckp_dir = checkpoint_dir + str(epoch_name) 
-                torch.save(model, ckp_dir)
-
+    print("LR:", scheduler.get_last_lr())
+    print('Loss after epoch %5d: %.8f' % (epoch + 1, current_loss / len(train_dataloader)))
 
     # saving as checkpoint
     epoch_name = "MAMI_binary_model_" + str(epoch) + ".model"
@@ -114,43 +112,31 @@ for epoch in range(0, n_epochs):  # 5 epochs at maximum
     torch.save(model, ckp_dir)
 
 
-    '''
     ##### Validation #####
-    mater.eval()
+    model.eval()
     total_val_loss = 0
-    counter_zero = 0
-    counter_out_0 = 0
-    counter_out_01 = 0
-    counter_out_001 = 0
-    list_outputs = []
-    for i, batch in enumerate(tqdm(val_dataloader)):
-        with torch.no_grad():
-            audios, texts, targets = data
-            audios = torch.stack(audios).to(device)
-            targets = torch.stack(targets).to(device)
 
-            outputs = mater(audios, texts)
+    list_outputs = []
+    ground_truth = []
+    for i, data in enumerate(tqdm(val_dataloader)):
+        with torch.no_grad():
+            texts, images, targets = data
+            targets = torch.tensor(targets).to(device).float()
+            outputs = model(texts, images)
             out = [o.item() for o in outputs]
             list_outputs.extend(list(out))
-            counter_zero += len([o for o in out if o == 0])
-            counter_out_0 += len([o for o in out if o > 0])
-            counter_out_01 += len([o for o in out if o > 0.1])
-            counter_out_001 += len([o for o in out if o > 0.01])
+            tar = [t.item() for t in targets]
+            ground_truth.extend(tar)
 
-        total_val_loss += loss_function(outputs, targets)
+        total_val_loss += loss_function(outputs, targets).item()
 
-    # Plot Histogram on x
-    x = list_outputs
-    plt.hist(x, bins=50)
-    plt.gca().set(title='Frequency Histogram', ylabel='Frequency');
-    plt.savefig('histograms/'+target_score+'_val_pred_ep_'+str(epoch)+'_distribution.png')
-
-    print("Predicted = 0", counter_zero)
-    print("Predicted > 0", counter_out_0)
-    print("Predicted > 0.01", counter_out_001)
-    print ("Predicted > 0.1", counter_out_01)
     avg_val_loss = total_val_loss / len(val_dataloader)
-    print("Validation Loss: %.8f" % (avg_val_loss))
+    acc = binary_acc(torch.tensor(list_outputs),torch.tensor(ground_truth))
+
+    print("Validation Loss:", total_val_loss)
+    print("Validation Accuracy", acc)
+
+    '''
     f = open("val_loss_"+ target_score + ".txt", "a+")
     f.write("Validation loss ("+target_score+") at epoch " + str(epoch) + ":\t %.8f \n" % (avg_val_loss))
     f.close()

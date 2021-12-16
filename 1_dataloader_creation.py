@@ -28,7 +28,7 @@ else:
 percentage_train = 0.75
 
 # batch size: adjust based on GPU memory
-batch_size = 32
+batch_size = 64
 
 # BERT tokenizer for text
 text_model_name = "bert-base-cased"
@@ -61,7 +61,7 @@ for i in tqdm(range(int(len(names)*percentage_train))):
 
 train_dataloader = MAMI_binary_dataset(train_text, train_image_path, text_tokenizer, train_label, max_length=128)
 train_dataloader = DataLoader(train_dataloader, batch_size=batch_size, shuffle=True,
-                              num_workers=16, pin_memory=True, collate_fn=collate_fn, prefetch_factor=4)
+                              num_workers=24, pin_memory=True, collate_fn=collate_fn, prefetch_factor=4)
 torch.save(train_dataloader, "dataloaders/train_binary_dataloader.bkp")
 del train_dataloader
 gc.collect()
@@ -83,5 +83,5 @@ for i in tqdm(range(int(len(names)*percentage_train), len(names), 1)):
 
 val_dataloader = MAMI_binary_dataset(val_text, val_image_path, text_tokenizer, val_label, max_length = 128)
 val_dataloader = DataLoader(val_dataloader, batch_size=batch_size, shuffle=True,
-                            num_workers=16, pin_memory=True, collate_fn=collate_fn, prefetch_factor=4)
+                            num_workers=24, pin_memory=True, collate_fn=collate_fn, prefetch_factor=4)
 torch.save(val_dataloader, "dataloaders/val_binary_dataloader.bkp")
