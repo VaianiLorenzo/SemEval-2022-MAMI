@@ -23,7 +23,10 @@ class MLP(nn.Module):
         h_3 = F.relu(self.hidden_fc_2(h_2))
         '''
         h_1 = F.relu(self.input_fc(x))
-        y_pred = torch.sigmoid(self.output_fc(h_1))
+        #y_pred = torch.sigmoid(self.output_fc(h_1))
+
+        # no final sigmoid because alredy in the BCE loss function
+        y_pred = self.output_fc(h_1)
 
         return y_pred
 

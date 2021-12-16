@@ -4,6 +4,9 @@ import torchvision.utils as utils
 import torchvision
 import torchvision.transforms as T
 
+from PIL import Image
+import numpy as np
+
 class MAMI_binary_dataset(data.Dataset):
 
     def __init__(self, text, image_path, text_processor, label, max_length=128):
@@ -20,14 +23,21 @@ class MAMI_binary_dataset(data.Dataset):
         data = img.astype(np.float32)
         data = 255 * data
         img = data.astype(np.uint8)
+
+        if len(img.shape) == 2:
+            img = np.repeat(img[:, :, np.newaxis], 3, axis=2)
+
+        #try:
         img = self.transform(img)
-
         return self.text_processor(self.text[index], padding="max_length", max_length=self.max_length, truncation=True, return_tensors='pt'), img, self.label[index]
-
+        #except Exception as e:
+        #    print("Exception:",e)
+        #    print(img.shape)
 
     transform = T.Compose([
         T.ToPILImage(),
         T.Resize(224),
+        T.CenterCrop(224),
         T.ToTensor(),
         T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
