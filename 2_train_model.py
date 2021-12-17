@@ -17,8 +17,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import argparse
 
-from data_loaders import DataLoaderCreator
-
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s')
@@ -68,6 +66,8 @@ def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloade
         # Iterate over the DataLoader for training data
         model.train()
 
+        list_outputs = []
+        ground_truth = []
         print ("init. training")
         for i, data in enumerate(tqdm(train_dataloader), 0):
             # Get and prepare inputs
@@ -79,6 +79,12 @@ def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloade
 
             # Perform forward pass
             outputs = model(texts, images)
+
+            # update lists for accuracy computation
+            out = [o.item() for o in outputs]
+            list_outputs.extend(list(out))
+            tar = [t.item() for t in targets]
+            ground_truth.extend(tar)
 
             # compute loss
             loss = loss_function(outputs, targets)
@@ -95,8 +101,11 @@ def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloade
             # Print statistics
             current_loss += loss.item()
 
+        train_acc = binary_acc(torch.tensor(list_outputs), torch.tensor(ground_truth))
+
         print("LR:", scheduler.get_last_lr())
         print('Loss after epoch %5d: %.8f' % (epoch + 1, current_loss / len(train_dataloader)))
+        print("Train Accuracy", train_acc)
 
         # saving as checkpoint
         epoch_name = "MAMI_binary_model_" + str(epoch) + ".model"
@@ -123,21 +132,28 @@ def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloade
             total_val_loss += loss_function(outputs, targets).item()
 
         avg_val_loss = total_val_loss / len(val_dataloader)
-        acc = binary_acc(torch.tensor(list_outputs),torch.tensor(ground_truth))
+        val_acc = binary_acc(torch.tensor(list_outputs),torch.tensor(ground_truth))
 
-        print("Validation Loss:", total_val_loss)
-        print("Validation Accuracy", acc)
+        print("Validation Loss:", avg_val_loss)
+        print("Validation Accuracy", val_acc)
 
         f = open("log_file.txt", "a+")
         f.write("Epoch " + str(epoch + 1) + ":\n")
         f.write("\tTrain loss:\t\t%.8f \n" % (current_loss / len(train_dataloader)))
+        f.write("\tTrain ACCURACY:\t" + str(train_acc) + "\n")
         f.write("\tValidation loss:\t%.8f \n" % (avg_val_loss))
-        f.write("\tValidation ACCURACY:\t" + str(acc) + "\n")
+        f.write("\tValidation ACCURACY:\t" + str(val_acc) + "\n")
         f.close()
 
         if comet_log:
             experiment.log_metrics(
                 {"Loss": current_loss / len(train_dataloader)},
+                prefix="Train",
+                step=(epoch + 1),
+            )
+
+            experiment.log_metrics(
+                {"Accuracy": train_acc},
                 prefix="Train",
                 step=(epoch + 1),
             )
@@ -149,7 +165,7 @@ def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloade
             )
 
             experiment.log_metrics(
-                {"Accuracy": acc},
+                {"Accuracy": val_acc},
                 prefix="Validation",
                 step=(epoch + 1),
             )
@@ -159,6 +175,11 @@ if __name__ == "__main__":
     # COMMAND LINE ARGS #
     #-------------------#
     parser = argparse.ArgumentParser(description="Running Server ML")
+    parser.add_argument(
+        "--mod",
+        type=str,
+        help="Training Modality",
+        default="multimodal", required=False)
     parser.add_argument(
         "--epochs",
         type=int,
@@ -181,6 +202,7 @@ if __name__ == "__main__":
     n_epochs = args.epochs
     lr = args.lr
     gamma = args.gamma
+    mod = args.mod
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -189,7 +211,7 @@ if __name__ == "__main__":
     print("Loading val dataloader..")
     val_dataloader = torch.load("dataloaders/val_binary_dataloader.bkp")
 
-    model = MAMI_binary_model(device=device)
+    model = MAMI_binary_model(device=device, modality=mod)
     model.to(device)
     model.train()
 
