@@ -24,10 +24,10 @@ class MAMI_binary_model(nn.Module):
         self.text_model = self.text_model.to(self.device)
         self.len_text_embeddings = self.text_model.config.hidden_size
 
-        self.intermediate_embeddings_len = self.len_text_embeddings + 512
+        self.intermediate_embeddings_len = self.len_text_embeddings + 2048
 
         # instantiate ResNet for image  processing
-        self.image_model = models.resnet18(pretrained=True)
+        self.image_model = models.resnet50(pretrained=True)
         self.avg_layer = self.image_model._modules.get('avgpool')
 
         # instantiate MLP
@@ -40,7 +40,7 @@ class MAMI_binary_model(nn.Module):
         # get features extracted after last avg pool layer, before fully connected part
         image_embeddings = []
         for element in x_image:
-            image_embedding = torch.zeros(512)
+            image_embedding = torch.zeros(2048)
 
             def copy_data(m, i, o):
                 image_embedding.copy_(o.data.reshape(o.data.size(1)))
