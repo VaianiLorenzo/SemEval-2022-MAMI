@@ -10,7 +10,7 @@ from torch.optim import AdamW
 from torch import optim
 from tqdm import tqdm
 import os
-from model import MAMI_binary_model
+from vb_model import MAMI_vb_binary_model
 import logging
 import multiprocessing
 import matplotlib.pyplot as plt
@@ -37,7 +37,7 @@ batch_size = None
 n_workers = None
 n_epochs = None
 
-checkpoint_dir = "checkpoints_binary_model/"
+checkpoint_dir = "checkpoints_vb_binary_model/"
 
 def collate_fn(batch):
     text  = [item[0] for item in batch]
@@ -176,11 +176,6 @@ if __name__ == "__main__":
     #-------------------#
     parser = argparse.ArgumentParser(description="Running Server ML")
     parser.add_argument(
-        "--mod",
-        type=str,
-        help="Training Modality",
-        default="multimodal", required=False)
-    parser.add_argument(
         "--epochs",
         type=int,
         help="Number of epochs",
@@ -202,16 +197,15 @@ if __name__ == "__main__":
     n_epochs = args.epochs
     lr = args.lr
     gamma = args.gamma
-    mod = args.mod
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     print("Loading train dataloader..")
-    train_dataloader = torch.load("dataloaders/train_binary_dataloader95.bkp")
+    train_dataloader = torch.load("dataloaders/train_vb_binary_dataloader.bkp")
     print("Loading val dataloader..")
-    val_dataloader = torch.load("dataloaders/val_binary_dataloader5.bkp")
+    val_dataloader = torch.load("dataloaders/val_vb_binary_dataloader.bkp")
 
-    model = MAMI_binary_model(device=device, modality=mod)
+    model = MAMI_vb_binary_model(device=device)
     model.to(device)
     model.train()
 
