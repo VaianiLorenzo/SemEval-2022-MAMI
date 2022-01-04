@@ -24,7 +24,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-comet_log = False
+comet_log = True
 if comet_log:
     experiment = Experiment(
         api_key="LiMIt9D5WsCZo294IIYymGhdv",

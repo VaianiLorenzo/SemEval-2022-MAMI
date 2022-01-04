@@ -8,7 +8,7 @@ import torchvision.models as models
 from mlp import MLP
 
 from transformers import AutoTokenizer, AutoModel
-from transformers import BertTokenizer, VisualBertForPreTraining
+from transformers import BertTokenizer, VisualBertModel, VisualBertForPreTraining
 
 from detectron2.modeling import build_model
 from detectron2.checkpoint import DetectionCheckpointer
@@ -23,14 +23,20 @@ from detectron2.config import get_cfg
 import cv2
 
 class MAMI_vb_binary_model(nn.Module):
-    def __init__(self, vb_model_name='uclanlp/visualbert-nlvr2-coco-pre', modality="multimodal",
+    def __init__(self, vb_model_name='uclanlp/visualbert-nlvr2-coco-pre', modality="cls",
                  device=None, text_tokenizer=None
                  ):
         super().__init__()
 
         self.device = device
-        self.model = VisualBertForPreTraining.from_pretrained(vb_model_name)  # this checkpoint has 1024 dimensional visual embeddings projection
-        self.model.to(self.device)
+        self.modality = modality
+        # self.model = VisualBertForPreTraining.from_pretrained(vb_model_name)  # this checkpoint has 1024 dimensional visual embeddings projection
+        self.visual_bert = VisualBertModel.from_pretrained(vb_model_name)
+        self.visual_bert.to(self.device)
+
+        # instantiate MLP
+        self.mlp = MLP(input_dim=768, output_dim=1)
+        self.mlp = self.mlp.to(self.device)
 
     def forward(self, x_text, x_image):
 
@@ -39,7 +45,7 @@ class MAMI_vb_binary_model(nn.Module):
         cfg = get_cfg()
         cfg.merge_from_file(model_zoo.get_config_file(cfg_path))
         cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5 # ROI HEADS SCORE THRESHOLD
-        #cfg['MODEL']['DEVICE'] = 'cpu' # if you are not using cuda
+        # cfg['MODEL']['DEVICE'] = 'cpu' # if you are not using cuda
         cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(cfg_path)
         model = build_model(cfg)
         checkpointer = DetectionCheckpointer(model) # load weights
@@ -78,7 +84,7 @@ class MAMI_vb_binary_model(nn.Module):
 
             visual_embeds.append(feats)
             visual_attention_mask.append(torch.tensor(mask).to(self.device))
-            visual_token_type_ids.append(torch.stack([torch.tensor([0] * len(feats)).to(self.device)]))
+            visual_token_type_ids.append(torch.tensor([1] * len(feats)).to(self.device))
 
         visual_embeds = torch.stack(visual_embeds)
         visual_attention_mask = torch.stack(visual_attention_mask)
@@ -91,21 +97,27 @@ class MAMI_vb_binary_model(nn.Module):
         attention_mask = torch.stack(attention_mask).to(self.device)
         token_type_ids = torch.stack(token_type_ids).to(self.device)
 
-        visual_embeds1 = visual_embeds
-        visual_embeds2 = visual_embeds
-        print(visual_embeds.shape)
-        vb = torch.cat((visual_embeds1, visual_embeds2), 0)
-        print(vb.shape)
-        vb = torch.cat((visual_embeds1, visual_embeds2), 1)
-        print(vb.shape)
-        vb = torch.cat((visual_embeds1, visual_embeds2), 2)
-        print(vb.shape)
+        outputs = self.visual_bert(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids,
+                                   visual_embeds=visual_embeds, visual_attention_mask=visual_attention_mask,
+                                   visual_token_type_ids=visual_token_type_ids)
 
-        outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids,
-                        visual_embeds=visual_embeds, visual_attention_mask=visual_attention_mask,
-                        visual_token_type_ids=visual_token_type_ids)
+        outputs_embeddings = outputs.last_hidden_state
 
-        return outputs
+        if self.modality == "cls":
+            cls_out_embeddings = outputs_embeddings[:, 0]
+            print(f"Shape cls output: {cls_out_embeddings.shape}")
+            predictions = torch.flatten(self.mlp(cls_out_embeddings))
+            print(predictions)
+        else:
+            l = []
+            for i in range(len(outputs_embeddings)):
+                average = self.global_average_pooling(outputs_embeddings[i])
+                l.append(average)
+            out_embedding_avg = torch.stack(l)
+
+            predictions = torch.flatten(self.mlp(out_embedding_avg))
+
+        return predictions
 
     def image_mean_pooling(self, model_output):
         result = torch.sum(model_output, 0) / model_output.size()[0]
@@ -115,3 +127,7 @@ class MAMI_vb_binary_model(nn.Module):
         token_embeddings = model_output[0]  # First element of model_output contains all token embeddings
         input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
         return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+
+    def global_average_pooling(self, model_output):
+        result = torch.sum(model_output, 0) / model_output.size()[0]
+        return result
