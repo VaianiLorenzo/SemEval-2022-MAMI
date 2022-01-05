@@ -199,6 +199,7 @@ if __name__ == "__main__":
     gamma = args.gamma
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # device = "cpu"
 
     print("Loading train dataloader..")
     train_dataloader = torch.load("dataloaders/train_vb_binary_dataloader.bkp")
