@@ -84,6 +84,10 @@ class MAMI_vb_binary_model(nn.Module):
         visual_token_type_ids = []
 
         for i in range(len(visual_embeds)):
+            # Cut out patch features if patches are more than 32
+            if len(visual_embeds[i]) > 32:
+                visual_embeds[i] = visual_embeds[i][:32]
+
             mask = [1] * len(visual_embeds[i])
             gap = 32 - len(visual_embeds[i])
             for _ in range(gap):

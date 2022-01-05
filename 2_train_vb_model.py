@@ -24,7 +24,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-comet_log = False
+comet_log = True
 if comet_log:
     experiment = Experiment(
         api_key="LiMIt9D5WsCZo294IIYymGhdv",
@@ -37,7 +37,7 @@ batch_size = None
 n_workers = None
 n_epochs = None
 
-checkpoint_dir = "checkpoints_vb_binary_model/"
+checkpoint_dir = "checkpoints_vb_binary_model_/"
 
 def collate_fn(batch):
     text  = [item[0] for item in batch]
@@ -52,7 +52,7 @@ def binary_acc(y_pred, y_test):
     acc = acc.item() * 100
     return acc
 
-def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloader):
+def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloader, maskr_mod):
     loss_function = BCEWithLogitsLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma = 1)
@@ -108,7 +108,7 @@ def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloade
         print("Train Accuracy", train_acc)
 
         # saving as checkpoint
-        epoch_name = "MAMI_binary_model_" + str(epoch) + ".model"
+        epoch_name = f"MAMI_vb_binary_model_{maskr_mod}_{epoch}.model"
         ckp_dir = checkpoint_dir + str(epoch_name)
         torch.save(model, ckp_dir)
 
@@ -179,7 +179,7 @@ if __name__ == "__main__":
         "--epochs",
         type=int,
         help="Number of epochs",
-        default=100, required=False)
+        default=50, required=False)
     parser.add_argument(
         "--lr",
         type=float,
@@ -230,4 +230,4 @@ if __name__ == "__main__":
         gamma) + " - step_size: " + str(percentage_epochs_per_step * n_epochs) + " epochs\n")
     f.close()
 
-    train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloader)
+    train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloader, maskr_mod)
