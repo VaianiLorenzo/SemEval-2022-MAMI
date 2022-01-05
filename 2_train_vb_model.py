@@ -24,7 +24,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-comet_log = True
+comet_log = False
 if comet_log:
     experiment = Experiment(
         api_key="LiMIt9D5WsCZo294IIYymGhdv",
@@ -190,6 +190,16 @@ if __name__ == "__main__":
         type=float,
         help="Gamma value for optimizer",
         default=0.5, required=False)
+    parser.add_argument(
+        "--class_mod",
+        type=str,
+        help="Classification Modality (Either cls or avg)",
+        default="cls", required=False)
+    parser.add_argument(
+        "--maskr_mod",
+        type=str,
+        help="Mask-RCNN Modality (coco, lvis or both)",
+        default="lvis", required=False)
 
 
     args = parser.parse_args()
@@ -197,6 +207,8 @@ if __name__ == "__main__":
     n_epochs = args.epochs
     lr = args.lr
     gamma = args.gamma
+    class_mod = args.class_mod
+    maskr_mod = args.maskr_mod
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # device = "cpu"
@@ -206,7 +218,7 @@ if __name__ == "__main__":
     print("Loading val dataloader..")
     val_dataloader = torch.load("dataloaders/val_vb_binary_dataloader.bkp")
 
-    model = MAMI_vb_binary_model(device=device)
+    model = MAMI_vb_binary_model(device=device, class_modality=class_mod, maskr_modality=maskr_mod)
     model.to(device)
     model.train()
 
