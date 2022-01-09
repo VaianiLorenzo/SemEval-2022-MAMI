@@ -1,22 +1,17 @@
+from comet_ml import Experiment
+
+import argparse
+import logging
+import os
+
 import numpy as np
 import sklearn
-import pandas as pd
-import random
-import comet_ml
-from comet_ml import Experiment
 import torch
-from torch.utils.data import TensorDataset, DataLoader, random_split
-from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss
-from torch.optim import AdamW
 from torch import optim
+from torch.nn import BCEWithLogitsLoss
 from tqdm import tqdm
-import os
+
 from model import MAMI_binary_model
-import logging
-import multiprocessing
-import matplotlib.pyplot as plt
-import seaborn as sns
-import argparse
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 

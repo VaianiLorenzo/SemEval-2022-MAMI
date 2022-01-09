@@ -1,11 +1,12 @@
+from comet_ml import Experiment
+
 import argparse
 import logging
 import os
 
 import numpy as np
-import sklearn
 import torch
-from comet_ml import Experiment
+import sklearn
 from torch import optim
 from torch.nn import BCEWithLogitsLoss
 from tqdm import tqdm
