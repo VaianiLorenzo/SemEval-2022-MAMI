@@ -155,6 +155,12 @@ def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloade
             )
 
             experiment.log_metrics(
+                {"F1": train_f1},
+                prefix="Train",
+                step=(epoch + 1),
+            )
+
+            experiment.log_metrics(
                 {"Loss": avg_val_loss},
                 prefix="Validation",
                 step=(epoch + 1),
@@ -162,6 +168,12 @@ def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloade
 
             experiment.log_metrics(
                 {"Accuracy": val_acc},
+                prefix="Validation",
+                step=(epoch + 1),
+            )
+
+            experiment.log_metrics(
+                {"F1": val_f1},
                 prefix="Validation",
                 step=(epoch + 1),
             )
@@ -175,7 +187,7 @@ if __name__ == "__main__":
         "--epochs",
         type=int,
         help="Number of epochs",
-        default=50, required=False)
+        default=25, required=False)
     parser.add_argument(
         "--lr",
         type=float,

@@ -1,5 +1,8 @@
 TRAINING/
 training.zip
+log_file.txt
+dataloaders/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
