@@ -92,7 +92,7 @@ def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloade
             current_loss += loss.item()
 
         train_acc = binary_acc(torch.tensor(list_outputs), torch.tensor(ground_truth))
-        train_f1 = f1_score(np.array(ground_truth, dtype=np.float32), np.array(list_outputs, dtype=np.float32))
+        train_f1 = f1_score(np.array(ground_truth), torch.round(torch.sigmoid(torch.tensor(list_outputs))).numpy())
 
         print("LR:", scheduler.get_last_lr())
         print('Loss after epoch %5d: %.8f' % (epoch + 1, current_loss / len(train_dataloader)))
@@ -125,7 +125,7 @@ def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloade
 
         avg_val_loss = total_val_loss / len(val_dataloader)
         val_acc = binary_acc(torch.tensor(list_outputs),torch.tensor(ground_truth))
-        val_f1 = f1_score(np.array(ground_truth, dtype=np.float32), np.array(list_outputs, dtype=np.float32))
+        val_f1 = f1_score(np.array(ground_truth), torch.round(torch.sigmoid(torch.tensor(list_outputs))).numpy())
 
         print("Validation Loss:", avg_val_loss)
         print("Validation Accuracy: ", val_acc)
