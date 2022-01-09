@@ -228,9 +228,9 @@ if __name__ == "__main__":
         )
 
     print("Loading train dataloader..")
-    train_dataloader = torch.load("dataloaders/train_binary_dataloader95.bkp")
+    train_dataloader = torch.load("dataloaders/train_binary_dataloader.bkp")
     print("Loading val dataloader..")
-    val_dataloader = torch.load("dataloaders/val_binary_dataloader5.bkp")
+    val_dataloader = torch.load("dataloaders/val_binary_dataloader.bkp")
 
     model = MAMI_binary_model(device=device, modality=mod)
     model.to(device)

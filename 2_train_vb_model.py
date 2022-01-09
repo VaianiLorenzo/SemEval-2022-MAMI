@@ -26,7 +26,7 @@ batch_size = None
 n_workers = None
 n_epochs = None
 
-checkpoint_dir = "checkpoints_vb_binary_model_/"
+checkpoint_dir = "checkpoints_vb_binary_model/"
 
 def collate_fn(batch):
     text  = [item[0] for item in batch]
