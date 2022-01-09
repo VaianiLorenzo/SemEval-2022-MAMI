@@ -14,6 +14,9 @@ import argparse
 percentage_train = 0.75
 path_dataset = "TRAINING/training.csv"
 
+# Always use the same train/validation split
+random_state = 1995
+
 # Set through command line arguments
 batch_size = None
 n_workers = None
@@ -26,7 +29,7 @@ def collate_fn(self, batch):
 
 def load_data():
     df = pd.read_csv(path_dataset, sep="\t")
-    df = df.sample(frac=1)
+    df = df.sample(frac=1, random_state=random_state)
     names = list(df["file_name"])
     misogynous = list(df['misogynous'])
     shaming = list(df['shaming'])

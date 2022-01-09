@@ -1,21 +1,16 @@
-import numpy as np
-import pandas as pd
-import random
-import comet_ml
-from comet_ml import Experiment
-import torch
-from torch.utils.data import TensorDataset, DataLoader, random_split
-from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss
-from torch.optim import AdamW
-from torch import optim
-from tqdm import tqdm
-import os
-from vb_model import MAMI_vb_binary_model
-import logging
-import multiprocessing
-import matplotlib.pyplot as plt
-import seaborn as sns
 import argparse
+import logging
+import os
+
+import numpy as np
+import sklearn
+import torch
+from comet_ml import Experiment
+from torch import optim
+from torch.nn import BCEWithLogitsLoss
+from tqdm import tqdm
+
+from vb_model import MAMI_vb_binary_model
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -25,12 +20,6 @@ logging.getLogger().setLevel(logging.INFO)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 comet_log = True
-if comet_log:
-    experiment = Experiment(
-        api_key="LiMIt9D5WsCZo294IIYymGhdv",
-        project_name="mami",
-        workspace="vaianilorenzo",
-    )
 
 # Arguments passed through command line
 batch_size = None
@@ -102,10 +91,13 @@ def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloade
             current_loss += loss.item()
 
         train_acc = binary_acc(torch.tensor(list_outputs), torch.tensor(ground_truth))
+        train_f1 = sklearn.metrics.f1_score(np.array(ground_truth, dtype=np.float32),
+                                            np.array(list_outputs, dtype=np.float32))
 
         print("LR:", scheduler.get_last_lr())
         print('Loss after epoch %5d: %.8f' % (epoch + 1, current_loss / len(train_dataloader)))
-        print("Train Accuracy", train_acc)
+        print("Train Accuracy: ", train_acc)
+        print("Train F1: ", train_f1)
 
         # saving as checkpoint
         epoch_name = f"MAMI_vb_binary_model_{maskr_mod}_{epoch}.model"
@@ -133,16 +125,20 @@ def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloade
 
         avg_val_loss = total_val_loss / len(val_dataloader)
         val_acc = binary_acc(torch.tensor(list_outputs),torch.tensor(ground_truth))
+        val_f1 = sklearn.metrics.f1_score(np.array(ground_truth, dtype=np.float32), np.array(list_outputs, dtype=np.float32))
 
         print("Validation Loss:", avg_val_loss)
-        print("Validation Accuracy", val_acc)
+        print("Validation Accuracy: ", val_acc)
+        print("Validation F1: ", val_f1)
 
         f = open("log_file.txt", "a+")
         f.write("Epoch " + str(epoch + 1) + ":\n")
         f.write("\tTrain loss:\t\t%.8f \n" % (current_loss / len(train_dataloader)))
         f.write("\tTrain ACCURACY:\t" + str(train_acc) + "\n")
+        f.write("\tTrain F1:\t" + str(train_f1) + "\n")
         f.write("\tValidation loss:\t%.8f \n" % (avg_val_loss))
         f.write("\tValidation ACCURACY:\t" + str(val_acc) + "\n")
+        f.write("\tValidation F1:\t" + str(val_f1) + "\n")
         f.close()
 
         if comet_log:
@@ -212,6 +208,13 @@ if __name__ == "__main__":
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # device = "cpu"
+
+    if comet_log:
+        experiment = Experiment(
+            api_key="LiMIt9D5WsCZo294IIYymGhdv",
+            project_name="mami",
+            workspace="vaianilorenzo",
+        )
 
     print("Loading train dataloader..")
     train_dataloader = torch.load("dataloaders/train_vb_binary_dataloader.bkp")
