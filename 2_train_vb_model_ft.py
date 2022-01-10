@@ -20,7 +20,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-comet_log = False
+comet_log = True
 
 # Arguments passed through command line
 batch_size = None
