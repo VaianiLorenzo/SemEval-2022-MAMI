@@ -207,7 +207,7 @@ if __name__ == "__main__":
         "--maskr_mod",
         type=str,
         help="Mask-RCNN Modality (coco, lvis or both)",
-        default="lvis", required=False)
+        default="both", required=False)
 
 
     args = parser.parse_args()
@@ -237,7 +237,7 @@ if __name__ == "__main__":
     model.to(device)
     model.train()
 
-    percentage_epochs_per_step = 0.4
+    percentage_epochs_per_step = 0.6
     step_size = n_epochs * len(train_dataloader) * percentage_epochs_per_step
 
     f = open("log_file.txt", "a+")

@@ -8,6 +8,7 @@ import pandas as pd
 from pympler.asizeof import asizeof
 import copy
 from MAMI_vb_binary_dataset import MAMI_vb_binary_dataset
+from MAMI_test_vb_binary_dataset import MAMI_test_vb_binary_dataset
 from transformers import AutoTokenizer
 import argparse
 
@@ -26,6 +27,11 @@ def collate_fn(self, batch):
     img = [item[1] for item in batch]
     label = [item[2] for item in batch]
     return [text, img, label]
+
+def test_collate_fn(self, batch):
+    text = [item[0] for item in batch]
+    img = [item[1] for item in batch]
+    return [text, img]
 
 def load_data():
     df = pd.read_csv(path_dataset, sep="\t")
@@ -108,3 +114,19 @@ if __name__ == "__main__":
     val_dataloader = DataLoader(val_dataloader, batch_size=batch_size, shuffle=True,
                                 num_workers=n_workers, pin_memory=True, collate_fn=collate_fn, prefetch_factor=4)
     torch.save(val_dataloader, "dataloaders/val_vb_binary_dataloader.bkp")
+
+
+    ####################
+    # TEST DATALOADER #
+    ####################
+
+    df = pd.read_csv("test/Test.csv", sep="\t")
+    images = list(df["file_name"])
+    for i in range(len(images)):
+        images[i] = "test/" + images[i]
+    texts = list(df["Text Transcription"])
+
+    test_dataloader = MAMI_test_vb_binary_dataset(texts, images, text_tokenizer, max_length=128)
+    test_dataloader = DataLoader(test_dataloader, batch_size=batch_size, shuffle=True,
+                                num_workers=n_workers, pin_memory=True, collate_fn=test_collate_fn, prefetch_factor=4)
+    torch.save(test_dataloader, "dataloaders/test_vb_binary_dataloader.bkp")
