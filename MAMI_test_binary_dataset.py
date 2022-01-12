@@ -7,18 +7,19 @@ import torchvision.transforms as T
 from PIL import Image
 import numpy as np
 
-class MAMI_binary_dataset(data.Dataset):
+class MAMI_test_binary_dataset(data.Dataset):
 
-    def __init__(self, text, image_path, text_processor, label, max_length=128):
+    def __init__(self, text, image_path, text_processor, max_length=128):
         self.text_processor = text_processor
         self.text = text
-        self.label = label
         self.max_length = max_length
         self.image_path = image_path
 
 
     def __getitem__(self, index):
         img = self.load_image(self.image_path[index])
+
+        
         data = img.astype(np.float32)
         data = 255 * data
         img = data.astype(np.uint8)
@@ -28,7 +29,7 @@ class MAMI_binary_dataset(data.Dataset):
 
         #try:
         img = self.transform(img)
-        return self.text_processor(self.text[index], padding="max_length", max_length=self.max_length, truncation=True, return_tensors='pt'), img, self.label[index]
+        return self.text_processor(self.text[index], padding="max_length", max_length=self.max_length, truncation=True, return_tensors='pt'), img, self.image_path[index]
         #except Exception as e:
         #    print("Exception:",e)
         #    print(img.shape)
