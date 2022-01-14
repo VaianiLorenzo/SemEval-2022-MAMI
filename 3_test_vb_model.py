@@ -16,8 +16,8 @@ else:
     torch.device('cpu')
     device = torch.device('cpu')
 
-modality = "both"
-epoch = 10
+modality = "lvis"
+epoch = 24
 
 model_dir = "checkpoints_vb_binary_model"
 model_name = "MAMI_vb_binary_model"
@@ -30,6 +30,7 @@ def test_collate_fn(batch):
     img = [item[1] for item in batch]
     return [text, img]
 
+model_list = ["MAMI_vb_binary_model_both_10.model", "MAMI_vb_binary_model_coco_24.model", "MAMI_vb_binary_model_coco_15.model"]
 
 test_dataloader = torch.load("dataloaders/test_vb_binary_dataloader.bkp")
 print("Test dataloader length:", len(test_dataloader))
