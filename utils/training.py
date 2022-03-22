@@ -1,39 +1,11 @@
-from comet_ml import Experiment
-
-import argparse
-import logging
 import os
 
 import numpy as np
-import torch
 from sklearn.metrics import f1_score
-from torch import optim
+import torch
 from torch.nn import BCEWithLogitsLoss
 from tqdm import tqdm
 
-from vb_model_tl import MAMI_vb_binary_model_tl
-
-torch.multiprocessing.set_sharing_strategy('file_system')
-
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s')
-logging.getLogger().setLevel(logging.INFO)
-
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-comet_log = True
-
-# Arguments passed through command line
-batch_size = None
-n_workers = None
-n_epochs = None
-
-checkpoint_dir = "checkpoints_vb_binary_model_tl/"
-
-def collate_fn(batch):
-    text  = [item[0] for item in batch]
-    img   = [item[1] for item in batch]
-    label = [item[2] for item in batch]
-    return [text, img, label]
 
 def binary_acc(y_pred, y_test):
     y_pred_tag = torch.round(torch.sigmoid(y_pred))
@@ -42,12 +14,12 @@ def binary_acc(y_pred, y_test):
     acc = acc.item() * 100
     return acc
 
-def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloader, maskr_mod):
-    loss_function = BCEWithLogitsLoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma = 1)
 
-    for epoch in range(0, n_epochs):  # 5 epochs at maximum
+def train_model(cfg, model, device, n_epochs, optimizer, scheduler, train_dataloader, val_dataloader,
+                path_dir_checkpoint, comet_exp):
+    loss_function = BCEWithLogitsLoss()
+
+    for epoch in range(0, n_epochs):
         print(f'Starting epoch {epoch + 1}')
 
         # Set current loss value
@@ -58,7 +30,7 @@ def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloade
 
         list_outputs = []
         ground_truth = []
-        print ("init. training")
+        print("init. training")
         for i, data in enumerate(tqdm(train_dataloader), 0):
             # Get and prepare inputs
             texts, images, targets = data
@@ -100,10 +72,11 @@ def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloade
         print("Train F1: ", train_f1)
 
         # saving as checkpoint
-        epoch_name = f"MAMI_vb_binary_model_tl_{maskr_mod}_{epoch}.model"
-        ckp_dir = checkpoint_dir + str(epoch_name)
-        torch.save(model, ckp_dir)
-
+        if cfg.MODEL.TYPE == "base":
+            file_name = f"MAMI_model_{cfg.MODEL.BASELINE_MODALITY}_{epoch}.model"
+        elif cfg.MODEL.TYPE == "visual_bert":
+            file_name = f"MAMI_vb_model_{cfg.MODEL.MASKR_MODALITY}_{epoch}.model"
+        torch.save(model, os.path.join(path_dir_checkpoint, file_name))
 
         ##### Validation #####
         model.eval()
@@ -124,7 +97,7 @@ def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloade
             total_val_loss += loss_function(outputs, targets).item()
 
         avg_val_loss = total_val_loss / len(val_dataloader)
-        val_acc = binary_acc(torch.tensor(list_outputs),torch.tensor(ground_truth))
+        val_acc = binary_acc(torch.tensor(list_outputs), torch.tensor(ground_truth))
         val_f1 = f1_score(np.array(ground_truth), torch.round(torch.sigmoid(torch.tensor(list_outputs))).numpy())
 
         print("Validation Loss:", avg_val_loss)
@@ -141,108 +114,39 @@ def train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloade
         f.write("\tValidation F1:\t" + str(val_f1) + "\n")
         f.close()
 
-        if comet_log:
-            experiment.log_metrics(
+        if cfg.COMET.ENABLED:
+            comet_exp.log_metrics(
                 {"Loss": current_loss / len(train_dataloader)},
                 prefix="Train",
                 step=(epoch + 1),
             )
 
-            experiment.log_metrics(
+            comet_exp.log_metrics(
                 {"Accuracy": train_acc},
                 prefix="Train",
                 step=(epoch + 1),
             )
 
-            experiment.log_metrics(
+            comet_exp.log_metrics(
                 {"F1": train_f1},
                 prefix="Train",
                 step=(epoch + 1),
             )
 
-            experiment.log_metrics(
+            comet_exp.log_metrics(
                 {"Loss": avg_val_loss},
                 prefix="Validation",
                 step=(epoch + 1),
             )
 
-            experiment.log_metrics(
+            comet_exp.log_metrics(
                 {"Accuracy": val_acc},
                 prefix="Validation",
                 step=(epoch + 1),
             )
 
-            experiment.log_metrics(
+            comet_exp.log_metrics(
                 {"F1": val_f1},
                 prefix="Validation",
                 step=(epoch + 1),
             )
-
-if __name__ == "__main__":
-    #-------------------#
-    # COMMAND LINE ARGS #
-    #-------------------#
-    parser = argparse.ArgumentParser(description="Running Server ML")
-    parser.add_argument(
-        "--epochs",
-        type=int,
-        help="Number of epochs",
-        default=25, required=False)
-    parser.add_argument(
-        "--lr",
-        type=float,
-        help="Learning rate",
-        default=5e-5, required=False)
-    parser.add_argument(
-        "--gamma",
-        type=float,
-        help="Gamma value for optimizer",
-        default=0.5, required=False)
-    parser.add_argument(
-        "--class_mod",
-        type=str,
-        help="Classification Modality (Either cls or avg)",
-        default="cls", required=False)
-    parser.add_argument(
-        "--maskr_mod",
-        type=str,
-        help="Mask-RCNN Modality (coco, lvis or both)",
-        default="lvis", required=False)
-
-
-    args = parser.parse_args()
-
-    n_epochs = args.epochs
-    lr = args.lr
-    gamma = args.gamma
-    class_mod = args.class_mod
-    maskr_mod = args.maskr_mod
-
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # device = "cpu"
-
-    if comet_log:
-        experiment = Experiment(
-            api_key="LiMIt9D5WsCZo294IIYymGhdv",
-            project_name="mami",
-            workspace="vaianilorenzo",
-        )
-
-    print("Loading train dataloader..")
-    train_dataloader = torch.load("dataloaders/train_vb_binary_dataloader.bkp")
-    print("Loading val dataloader..")
-    val_dataloader = torch.load("dataloaders/val_vb_binary_dataloader.bkp")
-
-    model = MAMI_vb_binary_model_tl(device=device, class_modality=class_mod, maskr_modality=maskr_mod)
-    model.to(device)
-    model.train()
-
-    percentage_epochs_per_step = 0.4
-    step_size = n_epochs * len(train_dataloader) * percentage_epochs_per_step
-
-    f = open("log_file.txt", "a+")
-    f.write("START TRAINING - " + str(n_epochs) + " epochs - LR: " + str(lr) + " - gamma: " + str(
-        gamma) + " - step_size: " + str(percentage_epochs_per_step * n_epochs) + " epochs\n")
-    f.close()
-
-    train_model(device, n_epochs, lr, step_size, train_dataloader, val_dataloader, maskr_mod)

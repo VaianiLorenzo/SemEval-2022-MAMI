@@ -1,7 +1,7 @@
 TRAINING/
 training.zip
-log_file.txt
-dataloaders/
+#log_file.txt
+data/
 
 
 # Byte-compiled / optimized / DLL files

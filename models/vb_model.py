@@ -7,46 +7,72 @@ from detectron2.config import get_cfg
 from detectron2.modeling import build_model
 from transformers import VisualBertModel
 
-from mlp import MLP
+from models.mlp import MLP
 
 
-class MAMI_vb_binary_model_ft(nn.Module):
+class MAMI_vb_binary_model(nn.Module):
 
-    def __init__(self, path_tl_model, device, n_frozen_layers=6):
+    def __init__(self, vb_model_name='uclanlp/visualbert-nlvr2-coco-pre', class_modality="cls", maskr_modality="coco",
+                 device=None, text_tokenizer=None
+                 ):
         super().__init__()
 
+        self.cfg_maskr_lvis = "LVISv0.5-InstanceSegmentation/mask_rcnn_R_101_FPN_1x.yaml"
+        self.cfg_maskr_coco = "COCO-InstanceSegmentation/mask_rcnn_R_101_FPN_3x.yaml"
+
         self.device = device
+        self.class_modality = class_modality
+        self.maskr_modality = maskr_modality
+        # self.model = VisualBertForPreTraining.from_pretrained(vb_model_name)  # this checkpoint has 1024 dimensional visual embeddings projection
+        self.visual_bert = VisualBertModel.from_pretrained(vb_model_name)
+        self.visual_bert.to(self.device)
 
-        # Load model from transfer learning phase
-        self.model = torch.load(path_tl_model)
+        if maskr_modality == "coco" or maskr_modality == "both":
+            cfg_path = self.cfg_maskr_coco
+            cfg = get_cfg()
+            cfg.merge_from_file(model_zoo.get_config_file(cfg_path))
+            cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # ROI HEADS SCORE THRESHOLD
+            # cfg['MODEL']['DEVICE'] = 'cpu' # if you are not using cuda
+            cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(cfg_path)
 
-        self.maskr_modality = self.model.maskr_modality
-        self.class_modality = self.model.class_modality
+            self.maskr_coco = build_model(cfg)
+            checkpointer = DetectionCheckpointer(self.maskr_coco)  # load weights
+            checkpointer.load(cfg.MODEL.WEIGHTS)
+            self.maskr_coco.eval()  # eval mode
+        else:
+            self.maskr_coco = None
 
-        # Set evaluation mode for Mask-R layers
-        if self.maskr_modality == "coco" or self.maskr_modality == "both":
-            self.model.maskr_coco.eval()
-        if self.maskr_modality == "lvis" or self.maskr_modality == "both":
-            self.model.maskr_lvis.eval()
+        if maskr_modality == "lvis" or maskr_modality == "both":
+            cfg_path = self.cfg_maskr_lvis
+            cfg = get_cfg()
+            cfg.merge_from_file(model_zoo.get_config_file(cfg_path))
+            cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # ROI HEADS SCORE THRESHOLD
+            # cfg['MODEL']['DEVICE'] = 'cpu' # if you are not using cuda
+            cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(cfg_path)
 
-        # Freeze the first n_frozen_layers of VisualBERT
-        vb_modules = [self.model.visual_bert.embeddings, *self.model.visual_bert.encoder.layer[:n_frozen_layers]]
-        for module in vb_modules:
-            for param in module.parameters():
-                param.requires_grad = False
+            self.maskr_lvis = build_model(cfg)
+            checkpointer = DetectionCheckpointer(self.maskr_lvis)  # load weights
+            checkpointer.load(cfg.MODEL.WEIGHTS)
+            self.maskr_lvis.eval()  # eval mode
+        else:
+            self.maskr_lvis = None
+
+        # instantiate MLP
+        self.mlp = MLP(input_dim=768, output_dim=1)
+        self.mlp = self.mlp.to(self.device)
 
     def forward(self, x_text, x_image):
         visual_embeds = None
 
         if self.maskr_modality == "coco" or self.maskr_modality == "both":
-            self.model.maskr_coco.eval()
-            feats_coco = self.calculate_feats_patches(self.model.maskr_coco, x_image)
+            self.maskr_coco.eval()
+            feats_coco = self.calculate_feats_patches(self.maskr_coco, x_image)
 
             visual_embeds = feats_coco
 
         if self.maskr_modality == "lvis" or self.maskr_modality == "both":
-            self.model.maskr_lvis.eval()
-            feats_lvis = self.calculate_feats_patches(self.model.maskr_lvis, x_image)
+            self.maskr_lvis.eval()
+            feats_lvis = self.calculate_feats_patches(self.maskr_lvis, x_image)
 
             if visual_embeds is None:
                 visual_embeds = feats_lvis
@@ -82,14 +108,15 @@ class MAMI_vb_binary_model_ft(nn.Module):
         attention_mask = torch.stack(attention_mask).to(self.device)
         token_type_ids = torch.stack(token_type_ids).to(self.device)
 
-        outputs = self.model.visual_bert(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids,
+        outputs = self.visual_bert(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids,
                                    visual_embeds=visual_embeds, visual_attention_mask=visual_attention_mask,
                                    visual_token_type_ids=visual_token_type_ids)
+
         outputs_embeddings = outputs.last_hidden_state
 
         if self.class_modality == "cls":
             cls_out_embeddings = outputs_embeddings[:, 0]
-            predictions = torch.flatten(self.model.mlp(cls_out_embeddings))
+            predictions = torch.flatten(self.mlp(cls_out_embeddings))
         else:
             l = []
             for i in range(len(outputs_embeddings)):
@@ -97,7 +124,7 @@ class MAMI_vb_binary_model_ft(nn.Module):
                 l.append(average)
             out_embedding_avg = torch.stack(l)
 
-            predictions = torch.flatten(self.model.mlp(out_embedding_avg))
+            predictions = torch.flatten(self.mlp(out_embedding_avg))
 
         return predictions
 
