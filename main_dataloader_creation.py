@@ -101,10 +101,10 @@ if __name__ == "__main__":
         val_label.append(misogynous[i])
 
     if cfg.MODEL.TYPE == "base":
-        val_dataloader = MAMI_binary_dataset(train_text, train_image_path, text_tokenizer, train_label,
+        val_dataloader = MAMI_binary_dataset(val_text, val_image_path, text_tokenizer, val_label,
                                              max_length=128)
     elif cfg.MODEL.TYPE == "visual_bert":
-        val_dataloader = MAMI_vb_binary_dataset(train_text, train_image_path, text_tokenizer, train_label,
+        val_dataloader = MAMI_vb_binary_dataset(val_text, val_image_path, text_tokenizer, val_label,
                                                 max_length=128)
     val_dataloader = DataLoader(val_dataloader, batch_size=cfg.DATALOADER.BATCH_SIZE, shuffle=True,
                                 num_workers=cfg.DATALOADER.N_WORKERS, pin_memory=True, collate_fn=collate_fn,
