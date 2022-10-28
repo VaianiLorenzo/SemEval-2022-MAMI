@@ -17,3 +17,13 @@ Main files:
 - "main_statistics.py": it allows to compute some statistics about visual elements retrieved by Mask R-CNN in the dataset. 
 - "main_test.py": allows to load a trained model to evaluate unlabeled samples.
 - "main_training.py": calls the training function and allows to train both our models. 
+
+## Citattion
+````
+@inproceedings{ravagli2022jrlv,
+  title={JRLV at semeval-2022 task 5: The importance of visual elements for misogyny identification in memes},
+  author={Ravagli, Jason and Vaiani, Lorenzo},
+  booktitle={Proceedings of the 16th International Workshop on Semantic Evaluation (SemEval-2022)},
+  pages={610--617},
+  year={2022}
+}
